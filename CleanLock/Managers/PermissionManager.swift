@@ -34,6 +34,8 @@ final class PermissionManager: ObservableObject {
     @Published private(set) var accessibilityStatus: PermissionState = .notGranted
     @Published private(set) var inputMonitoringStatus: PermissionState = .notGranted
 
+    private var activationObserver: NSObjectProtocol?
+
     var hasRequiredPermissions: Bool {
         accessibilityStatus == .granted && inputMonitoringStatus == .granted
     }
@@ -62,6 +64,7 @@ final class PermissionManager: ObservableObject {
 
     private init() {
         checkPermissions()
+        observeActivation()
     }
 
     func checkPermissions() {
@@ -71,6 +74,25 @@ final class PermissionManager: ObservableObject {
 
     func refresh() {
         checkPermissions()
+    }
+
+    /// Asks macOS to register CleanLock in the Accessibility list and to show the
+    /// system prompt. Without this call the app never appears in that list.
+    @discardableResult
+    func requestAccessibilityPermission() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        checkPermissions()
+        return trusted
+    }
+
+    /// Asks macOS to register CleanLock in the Input Monitoring list and to show
+    /// the system prompt. Without this call the app never appears in that list.
+    @discardableResult
+    func requestInputMonitoringPermission() -> Bool {
+        let granted = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        checkPermissions()
+        return granted
     }
 
     func openSystemSettingsForPermissions() {
@@ -96,6 +118,18 @@ final class PermissionManager: ObservableObject {
     private func openSystemSettingsPane(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private func observeActivation() {
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkPermissions()
+            }
+        }
     }
 
     private static func currentInputMonitoringStatus() -> PermissionState {

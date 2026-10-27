@@ -145,7 +145,9 @@ struct OnboardingView: View {
                 description: text(.accessibilityDescription),
                 status: permissions.accessibilityStatus,
                 action: {
-                    permissions.openAccessibilitySettings()
+                    if !permissions.requestAccessibilityPermission() {
+                        permissions.openAccessibilitySettings()
+                    }
                 }
             )
 
@@ -154,7 +156,9 @@ struct OnboardingView: View {
                 description: text(.inputMonitoringDescription),
                 status: permissions.inputMonitoringStatus,
                 action: {
-                    permissions.openInputMonitoringSettings()
+                    if !permissions.requestInputMonitoringPermission() {
+                        permissions.openInputMonitoringSettings()
+                    }
                 }
             )
 
